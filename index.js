@@ -28,9 +28,6 @@ function processContent(content){
         const createTime = temp.created_time;
         const currentDate = new Date('2023-01-01');
         const contentDate = new Date(createTime);
-        console.log(currentDate);
-        console.log(contentDate);
-        console.log(contentDate > currentDate);
         if(contentDate > currentDate){
             dataArr.push({id: id, content: contents, createDate: createTime});
         }
