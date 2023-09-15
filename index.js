@@ -67,11 +67,12 @@ const csvWriter = createCsvWriter({
 const url = 'https://graph.facebook.com/v17.0/355915284524115/feed?access_token=';
 const pictureUrl = 'https://graph.facebook.com/v17.0/';
 const pictureAccess = '/attachments?access_token=';
-const access_token = 'EAADg4X8ZAH5QBOzNanf4s3cxQbipESU05udhkQpQ8MDVbXomglWeHuZCVz9reYqyvtnLlPVYOtPrwsoSfvWfxb8rajOH0XlezT8wSS6au4GIVZBwDWFjOcEW2rO5YNLLPESG1SInLH2st8GKRtl4ZCHvWjpSIIvBBpQUZBQqeFfTSRIt08ejB1gggtUuiLb5JpWucQaK9j0qsZCNpIZALdKK12v';
+const access_token = 'EAADg4X8ZAH5QBOZC2leHizyXRHbqdotwYxpZAn7LuZAkLmcNKWlCdZAEF5hcER6RH9Vlhv9Ew3AJoZBZC2cAzZAKuvRWkMP3vAyCkxXZBXz4UcRPaEmHs6j24SzZAAyZCG7AMRPuXsAUnqY1wcifZAxWZApDgrCNS1TgWDRBqZBsvsigt5elz7e76ZA0x5dMYl5ZAYu5fxpXOjyVkZA0SBWZAHIDbMuryXDUrd';
 var dataArr = [];
 var lastProcessDate;
 
 const query = `SELECT * FROM config where config_name = 'PROCESS_DATE'`;
+const findTitle = `SELECT * FROM product_list where content = $1`;
 
 client.query(query, (err, res) => {
     if (err) {
@@ -131,22 +132,25 @@ async function processContent(content) {
       // Get the item description
       message = message.substring(0, 300);
 
-      // Add the item data to the data array
-      dataArr.push({
-        id: id,
-        engDescription: message,
-        chiDescription: message,
-        createDate: createTime,
-        price: price,
-        specificationNameAEng: size,
-        specificationNameAChi: size,
-        variationNameAEng: size,
-        variationNameAChi: size,
-        engTitle: title,
-        chiTitle: title,
-        picture: picture,
-        onlineStoreStatus: 'Y',
-      });
+      client.query(findTitle, [title], (err, res)=> {
+        if(res.rows.length ==0){
+          dataArr.push({
+            id: id,
+            engDescription: message,
+            chiDescription: message,
+            createDate: createTime,
+            price: price,
+            specificationNameAEng: size,
+            specificationNameAChi: size,
+            variationNameAEng: size,
+            variationNameAChi: size,
+            engTitle: title,
+            chiTitle: title,
+            picture: picture,
+            onlineStoreStatus: 'Y',
+          });
+        }
+    });
     }
   }
 
