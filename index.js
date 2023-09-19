@@ -1,13 +1,19 @@
 const axios = require('axios'); 
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
+const { Client } = require('pg');
+require('dotenv').config();
 
-const { Client } = require('pg')
+//get data from .env file
+const { DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_DATABASE } = process.env;
+
+
+
 const client = new Client({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'some2some',
-  password: 'postgres',
-  port: 5432,
+  user: DB_USER,
+  host: DB_HOST,
+  database: DB_DATABASE,
+  password: DB_PASSWORD,
+  port: DB_PORT,
 })
 client.connect(function(err) {
   if (err) throw err;
@@ -67,9 +73,10 @@ const csvWriter = createCsvWriter({
 const url = 'https://graph.facebook.com/v17.0/355915284524115/feed?access_token=';
 const pictureUrl = 'https://graph.facebook.com/v17.0/';
 const pictureAccess = '/attachments?access_token=';
-const access_token = 'EAADg4X8ZAH5QBOZC2leHizyXRHbqdotwYxpZAn7LuZAkLmcNKWlCdZAEF5hcER6RH9Vlhv9Ew3AJoZBZC2cAzZAKuvRWkMP3vAyCkxXZBXz4UcRPaEmHs6j24SzZAAyZCG7AMRPuXsAUnqY1wcifZAxWZApDgrCNS1TgWDRBqZBsvsigt5elz7e76ZA0x5dMYl5ZAYu5fxpXOjyVkZA0SBWZAHIDbMuryXDUrd';
+const access_token = 'EAADg4X8ZAH5QBO9oZBrrP9Y5K8U94SDYC6k4SPIueLDKe84owwKYIqe8Q1w9ZBMlna79zqEb2NV2KSHeUCInpgrHL8vurwFt4vUpA67ZCw4Ss1Pg8UDlns5DB4UZA6MEsCrrVRK1MgkY3wCphJYvidMhWzfEZCZCdcUxI97ZBq8ZCWaFqlDe7c3l0pxKNlmzqdgWC6XbJVruxiTqIfvgcvVZAjwwZC8';
 var dataArr = [];
 var lastProcessDate;
+let latestTime;
 
 const query = `SELECT * FROM config where config_name = 'PROCESS_DATE'`;
 const findTitle = `SELECT * FROM product_list where content = $1`;
@@ -132,7 +139,13 @@ async function processContent(content) {
       // Get the item description
       message = message.substring(0, 300);
 
-      client.query(findTitle, [title], (err, res)=> {
+      //find latest time
+      if(latestTime == null || latestTime < messageDate){
+        latestTime = messageDate;
+      }
+    // Query the database to see if the title already exists
+    client.query(findTitle, [title], (err, res)=> {
+        // If the title does not exist, add it to the data array
         if(res.rows.length ==0){
           dataArr.push({
             id: id,
@@ -149,10 +162,18 @@ async function processContent(content) {
             picture: picture,
             onlineStoreStatus: 'Y',
           });
+          // If the title is not empty, insert it into the database
+          if(title!=''){
+            console.log('Inserting: ' + title);
+            client.query(
+              `INSERT INTO "product_list" ("id", "content", "title", "price","createdate")  
+              VALUES ($1, $2, $3, $4, $5)`, [id, message, title,price,createTime]);
+          }
         }
+        
     });
-    }
   }
+}
 
   // If the content data has the next page
   if (content.data.paging.next) {
@@ -165,48 +186,68 @@ async function processContent(content) {
     // Write the data array to the CSV file
     csvWriter.writeRecords(dataArr);
 
+    //update database
+    client.query(
+      `UPDATE "config" SET "date" = $1 WHERE "config_name" = 'PROCESS_DATE'`, [latestTime]);
+
     // Output the end
-    console.log('END');
+    console.log('END' + dataArr.length);
   }
 }
 
 function getTitle(content) {
+  // Find the index of the first and last square brackets.
   const titleOpen = content.indexOf('【');
   const titleClose = content.indexOf('】');
   if(titleOpen < 0 || titleClose < 0){
+    // Return an empty string if the title is not found.
     return '';
   }
+  // Extract the title from the square brackets.
   const title = content.substring(titleOpen+1, titleClose);
   return title;
 }
 
 function getSize(content) {
+  // find the start of the size description
   const sizeOpen = content.indexOf('/');
+  // get the size description
   const sizeDesc = content.substring(sizeOpen+1, content.length);
+  // find the end of the size description
   const sizeClose = sizeDesc.indexOf('/');
+  // if we didn't find both /s, return an empty string
   if(sizeOpen < 0 || sizeClose < 0){
     return '';
   }
+  // get the size value
   const size = sizeDesc.substring(0, sizeClose);
+  // return the size value
   return size;
 }
 
 function getPrice(content) {
+  // Get the index of the $ sign
   const priceIndex = content.indexOf('$');
   
+  // If the $ sign is found
   if(priceIndex > 0){
+    // Get the price from the content
     var price = content.substring(priceIndex + 1, priceIndex+4);
+    // If the last character is not a number, remove it
     if(!isNumber(price.substring(price.length-1))){ 
         price = price.substring(0, price.length-1);
     }
   } else {
+    // If the $ sign is not found, return an empty string
     return '';
   }
 
+  // Return the price
   return price;
 }
 
 function isNumber(char) {
+  // 1. Check if the character is a digit
   return /^\d$/.test(char); 
 }
 
