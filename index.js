@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransport({
 });
 
 //get data from .env file
-const { DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_DATABASE } = process.env;
+const { DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_DATABASE, ACCESS_TOKEN} = process.env;
 
 
 
@@ -85,7 +85,7 @@ const csvWriter = createCsvWriter({
 const url = 'https://graph.facebook.com/v17.0/355915284524115/feed?access_token=';
 const pictureUrl = 'https://graph.facebook.com/v17.0/';
 const pictureAccess = '/attachments?access_token=';
-const access_token = 'EAADg4X8ZAH5QBOZCvgVOZBNpgNqoLsDflTXiOahVZCVMc8oCDDDSO6qiwW1XdA9GTOjeu2OwvWu5qGdRMqOtYwcC4RJKmNpr3wXQ76IuGKmiXcZAHZAZBb7pCwzZAGWpvsPqNc7jySww8OWjhZC2dXGn6vpvY6BL46UdG35aTZBcyDEBNLKi2dF9r1LQBjqvm6FwZAXytYKsSZAnFOWFIwk63wRPEwJR';
+const access_token = ACCESS_TOKEN;
 var dataArr = [];
 var lastProcessDate;
 let latestTime;
@@ -289,6 +289,8 @@ function isNumber(char) {
   // 1. Check if the character is a digit
   return /^\d$/.test(char); 
 }
+
+apiCall();
 
 //recursive call every day at 09:00
 schedule.scheduleJob('0 0 9 * * *', function(){
