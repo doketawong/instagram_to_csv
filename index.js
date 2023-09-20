@@ -1,7 +1,19 @@
 const axios = require('axios'); 
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const { Client } = require('pg');
+var schedule = require('node-schedule');
 require('dotenv').config();
+//send csv file to email
+const nodemailer = require('nodemailer');
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true, // upgrade later with STARTTLS
+  auth: {
+    user: "spijjw003@gmail.com",
+    pass: "gdsg knen qgaq ndku",
+  },
+});
 
 //get data from .env file
 const { DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_DATABASE } = process.env;
@@ -73,13 +85,13 @@ const csvWriter = createCsvWriter({
 const url = 'https://graph.facebook.com/v17.0/355915284524115/feed?access_token=';
 const pictureUrl = 'https://graph.facebook.com/v17.0/';
 const pictureAccess = '/attachments?access_token=';
-const access_token = 'EAADg4X8ZAH5QBO9oZBrrP9Y5K8U94SDYC6k4SPIueLDKe84owwKYIqe8Q1w9ZBMlna79zqEb2NV2KSHeUCInpgrHL8vurwFt4vUpA67ZCw4Ss1Pg8UDlns5DB4UZA6MEsCrrVRK1MgkY3wCphJYvidMhWzfEZCZCdcUxI97ZBq8ZCWaFqlDe7c3l0pxKNlmzqdgWC6XbJVruxiTqIfvgcvVZAjwwZC8';
+const access_token = 'EAADg4X8ZAH5QBOZCvgVOZBNpgNqoLsDflTXiOahVZCVMc8oCDDDSO6qiwW1XdA9GTOjeu2OwvWu5qGdRMqOtYwcC4RJKmNpr3wXQ76IuGKmiXcZAHZAZBb7pCwzZAGWpvsPqNc7jySww8OWjhZC2dXGn6vpvY6BL46UdG35aTZBcyDEBNLKi2dF9r1LQBjqvm6FwZAXytYKsSZAnFOWFIwk63wRPEwJR';
 var dataArr = [];
 var lastProcessDate;
 let latestTime;
 
 const query = `SELECT * FROM config where config_name = 'PROCESS_DATE'`;
-const findTitle = `SELECT * FROM product_list where content = $1`;
+const findTitle = `SELECT * FROM product_list where title = $1`;
 
 client.query(query, (err, res) => {
     if (err) {
@@ -112,6 +124,8 @@ async function processContent(content) {
 
     // Get the last process date
     const currentDate = new Date(lastProcessDate);
+    //set current date to 23:59:59
+    currentDate.setHours(23,59,59,999);
 
     // Get the message created time
     const messageDate = new Date(createTime);
@@ -145,7 +159,7 @@ async function processContent(content) {
       }
     // Query the database to see if the title already exists
     client.query(findTitle, [title], (err, res)=> {
-        // If the title does not exist, add it to the data array
+        // If the title does not exist, add it to the data array)
         if(res.rows.length ==0){
           dataArr.push({
             id: id,
@@ -187,11 +201,36 @@ async function processContent(content) {
     csvWriter.writeRecords(dataArr);
 
     //update database
-    client.query(
-      `UPDATE "config" SET "date" = $1 WHERE "config_name" = 'PROCESS_DATE'`, [latestTime]);
+    if(latestTime){
+      client.query(
+        `UPDATE "config" SET "date" = $1 WHERE "config_name" = 'PROCESS_DATE'`, [latestTime]);
+    }
+
+    const displayTime = latestTime.toLocaleString('en-US', { timeZone: 'Asia/Hong_Kong' });
+
+    const mailOptions = {
+      from: 'spijjw003@gmail.com',
+      to: '1155086874@link.cuhk.edu.hk',
+      subject: 'Update Shopline Product List ' + displayTime,
+      text: 'Upload product',
+      attachments: [
+        {
+          filename: 'instagram.csv',
+          path: './instagram.csv',
+        },
+      ],
+    };
+    
+    transporter.sendMail(mailOptions, function (err, info) {
+      if (err) {
+        console.log(err);
+      } else {
+        console.log(info);
+      }
+    });
 
     // Output the end
-    console.log('END' + dataArr.length);
+    console.log('END ' + dataArr.length);
   }
 }
 
@@ -251,4 +290,7 @@ function isNumber(char) {
   return /^\d$/.test(char); 
 }
 
-apiCall();
+//recursive call every day at 09:00
+schedule.scheduleJob('0 0 9 * * *', function(){
+  apiCall();
+});
