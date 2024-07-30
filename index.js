@@ -55,14 +55,16 @@ client.query(query, (err, res) => {
 
 async function apiCall() {
   dataArr = [];
-  const response = await axios.get(url + access_token).then(function (content) {
-    processContent(content);
-  });
+  const response = await axios.get(url + access_token);
+  await processContent(response);
+  if (dataArr.length > 0) {
+    writeCsv();
+  }
 }
 
 async function processContent(content) {
   // For each item in the content data
-  let previousDate = false;
+  let previousDate = true;
   for (const item of content.data.data) {
     // Get the item ID
     const id = item.id;
@@ -112,37 +114,36 @@ async function processContent(content) {
         latestTime = messageDate;
       }
       // Query the database to see if the title already exists
-      client.query(findTitle, [title], (err, res) => {
-        // If the title does not exist, add it to the data array)
-        console.log('Duplicate: ' + res.rows.length + ' ' + title);
-        if (res.rows.length == 0 && title != '') {
-          dataArr.push({
-            id: id,
-            engDescription: message,
-            chiDescription: message,
-            engSeoDescription: seoDescription,
-            chiSeoDescription: seoDescription,
-            price: price,
-            specificationNameAEng: size,
-            specificationNameAChi: size,
-            variationNameAEng: size,
-            variationNameAChi: size,
-            engTitle: title,
-            chiTitle: title,
-            picture: picture,
-            onlineStoreStatus: 'Y',
-            createDate: createTime,
-          });
-          client
-            .query(
-              `INSERT INTO "product_list" ("id", "content", "title", "price","createdate")  
-              VALUES ($1, $2, $3, $4, $5)`,
-              [id, message, title, price, createTime],
-            )
-            .then(() => console.log('inserted'));
-        }
-      });
-    } else{
+      const res = await client.query(findTitle, [title]);
+
+      // If the title does not exist, add it to the data array
+      if (res.rows.length == 0 && title != '') {
+        console.log('Insert: ' + title);
+        dataArr.push({
+          id: id,
+          engDescription: message,
+          chiDescription: message,
+          engSeoDescription: seoDescription,
+          chiSeoDescription: seoDescription,
+          price: price,
+          specificationNameAEng: size,
+          specificationNameAChi: size,
+          variationNameAEng: size,
+          variationNameAChi: size,
+          engTitle: title,
+          chiTitle: title,
+          picture: picture,
+          onlineStoreStatus: 'Y',
+          createDate: createTime,
+        });
+
+        await client.query(
+          `INSERT INTO "product_list" ("id", "content", "title", "price","createdate")  
+      VALUES ($1, $2, $3, $4, $5)`,
+          [id, message, title, price, createTime],
+        );
+      }
+    } else {
       previousDate = false;
     }
   }
@@ -151,116 +152,120 @@ async function processContent(content) {
   if (content.data.paging.next && previousDate) {
     //TODO: skip next page if current page date is earlier than last process date
     // Get the next page content
+    console.log('getting next page...');
     axios.get(content.data.paging.next).then(function (tempResponse) {
       // Process the next page content
       processContent(tempResponse);
     });
   } else {
-    console.log('writing to file...');
-    const csvWriter = createCsvWriter({
-      path: 'instagram.csv',
-      header: [
-        {id: 'id', title: 'No'},
-        {id: 'engTitle', title: 'Eng Title'},
-        {id: 'chiTitle', title: 'Chi Title'},
-        {id: 'engSummary', title: 'Eng Summary'},
-        {id: 'chiSummary', title: 'Chi Summary'},
-        {id: 'engDescription', title: 'Eng Description'},
-        {id: 'chiDescription', title: 'Chi Description'},
-        {id: 'engSeoTitle', title: 'Eng SEO Title'},
-        {id: 'chiSeoTitle', title: 'Chi SEO Title'},
-        {id: 'engSeoDescription', title: 'Eng SEO Description'},
-        {id: 'chiSeoDescription', title: 'Chi SEO Description'},
-        {id: 'seoKeywords', title: 'SEO keywords'},
-        {id: 'preorderItem', title: 'Preorder Item'},
-        {id: 'preorderEngNote', title: 'Preorder Eng Note'},
-        {id: 'preorderChiNote', title: 'Preorder Chi Note'},
-        {id: 'onlineStoreStatus', title: 'Online Store Status'},
-        {id: 'picture', title: 'Picture'},
-        {id: 'additionalPicture', title: 'Additional Picture'},
-        {id: 'onlineStoreCategoriesEng', title: 'Online Store Categories Eng'},
-        {id: 'onlineStoreCategoriesChi', title: 'Online Store Categories Chi'},
-        {id: 'price', title: 'Price'},
-        {id: 'salePrice', title: 'Sale Price'},
-        {id: 'cost', title: 'cost'},
-        {id: 'sku', title: 'sku'},
-        {id: 'quantity', title: 'quantity'},
-        {id: 'weight', title: 'weight'},
-        {id: 'productTag', title: 'Product Tag'},
-        {id: 'specificationNameAEng', title: 'Specification Name A Eng'},
-        {id: 'specificationNameAChi', title: 'Specification Name A Chi'},
-        {id: 'specificationNameBEng', title: 'Specification Name B Eng'},
-        {id: 'specificationNameBChi', title: 'Specification Name B Chi'},
-        {id: 'variationImage', title: 'Variation Image'},
-        {id: 'variationNameAEng', title: 'Variation name A Eng'},
-        {id: 'variationNameAChi', title: 'Variation name A Chi'},
-        {id: 'a', title: 'Variation name B(English)'},
-        {id: 'b', title: 'Variation name B(Chinese)'},
-        {id: 'c', title: 'Variation quantity'},
-        {id: 'd', title: 'Variation price'},
-        {id: 'e', title: 'Variant Sale Price'},
-        {id: 'f', title: 'Variant Cost'},
-        {id: 'g', title: 'Variation SKU'},
-        {id: 'h', title: 'Variant Weight'},
-        {id: 'i', title: 'Barcode'},
-        {id: 'createDate', title: 'CreateDate'},
-      ],
-    });
-    // Write the data array to the CSV file
-    csvWriter.writeRecords(dataArr)
-  .then(() => {
+    return dataArr;
+  }
+}
+
+function writeCsv() {
+  console.log('writing to file...');
+  const csvWriter = createCsvWriter({
+    path: 'instagram.csv',
+    header: [
+      {id: 'id', title: 'No'},
+      {id: 'engTitle', title: 'Eng Title'},
+      {id: 'chiTitle', title: 'Chi Title'},
+      {id: 'engSummary', title: 'Eng Summary'},
+      {id: 'chiSummary', title: 'Chi Summary'},
+      {id: 'engDescription', title: 'Eng Description'},
+      {id: 'chiDescription', title: 'Chi Description'},
+      {id: 'engSeoTitle', title: 'Eng SEO Title'},
+      {id: 'chiSeoTitle', title: 'Chi SEO Title'},
+      {id: 'engSeoDescription', title: 'Eng SEO Description'},
+      {id: 'chiSeoDescription', title: 'Chi SEO Description'},
+      {id: 'seoKeywords', title: 'SEO keywords'},
+      {id: 'preorderItem', title: 'Preorder Item'},
+      {id: 'preorderEngNote', title: 'Preorder Eng Note'},
+      {id: 'preorderChiNote', title: 'Preorder Chi Note'},
+      {id: 'onlineStoreStatus', title: 'Online Store Status'},
+      {id: 'picture', title: 'Picture'},
+      {id: 'additionalPicture', title: 'Additional Picture'},
+      {id: 'onlineStoreCategoriesEng', title: 'Online Store Categories Eng'},
+      {id: 'onlineStoreCategoriesChi', title: 'Online Store Categories Chi'},
+      {id: 'price', title: 'Price'},
+      {id: 'salePrice', title: 'Sale Price'},
+      {id: 'cost', title: 'cost'},
+      {id: 'sku', title: 'sku'},
+      {id: 'quantity', title: 'quantity'},
+      {id: 'weight', title: 'weight'},
+      {id: 'productTag', title: 'Product Tag'},
+      {id: 'specificationNameAEng', title: 'Specification Name A Eng'},
+      {id: 'specificationNameAChi', title: 'Specification Name A Chi'},
+      {id: 'specificationNameBEng', title: 'Specification Name B Eng'},
+      {id: 'specificationNameBChi', title: 'Specification Name B Chi'},
+      {id: 'variationImage', title: 'Variation Image'},
+      {id: 'variationNameAEng', title: 'Variation name A Eng'},
+      {id: 'variationNameAChi', title: 'Variation name A Chi'},
+      {id: 'a', title: 'Variation name B(English)'},
+      {id: 'b', title: 'Variation name B(Chinese)'},
+      {id: 'c', title: 'Variation quantity'},
+      {id: 'd', title: 'Variation price'},
+      {id: 'e', title: 'Variant Sale Price'},
+      {id: 'f', title: 'Variant Cost'},
+      {id: 'g', title: 'Variation SKU'},
+      {id: 'h', title: 'Variant Weight'},
+      {id: 'i', title: 'Barcode'},
+      {id: 'createDate', title: 'CreateDate'},
+    ],
+  });
+  // Write the data array to the CSV file
+  csvWriter.writeRecords(dataArr).then(() => {
     const fs = require('fs');
     const csv = fs.readFileSync('instagram.csv');
-    const BOM = "\ufeff";
+    const BOM = '\ufeff';
     fs.writeFileSync('instagram.csv', BOM + csv);
   });
 
-    //update database
-    let displayTime;
-    //update database
-    if (latestTime) {
-      client.query(
-        `UPDATE "config" SET "date" = $1 WHERE "config_name" = 'PROCESS_DATE'`,
-        [latestTime],
-      );
+  //update database
+  let displayTime;
+  //update database
+  if (latestTime) {
+    client.query(
+      `UPDATE "config" SET "date" = $1 WHERE "config_name" = 'PROCESS_DATE'`,
+      [latestTime],
+    );
 
-      displayTime = latestTime.toLocaleString('en-US', {
-        timeZone: 'Asia/Hong_Kong',
-      });
-    }
+    displayTime = latestTime.toLocaleString('en-US', {
+      timeZone: 'Asia/Hong_Kong',
+    });
+  }
 
-    console.log(dataArr.length + ' records written to file.');
-    const mailOptions = {
-      from: 'spijjw003@gmail.com',
-      to: '1155086874@link.cuhk.edu.hk',
-      subject: 'Update Shopline Product List ' + displayTime,
-      text: 'Upload product',
-      attachments: [
-        {
-          filename: 'instagram.csv',
-          path: './instagram.csv',
-        },
-      ],
-    };
-    if (dataArr.length > 0) {
-      transporter.sendMail(mailOptions, function (err, info) {
-        if (err) {
-          console.log(err);
-        } else {
-          console.log(info);
-        }
-      });
+  console.log(dataArr.length + ' records written to file.');
+  const mailOptions = {
+    from: 'spijjw003@gmail.com',
+    to: '1155086874@link.cuhk.edu.hk',
+    subject: 'Update Shopline Product List ' + displayTime,
+    text: 'Upload product',
+    attachments: [
+      {
+        filename: 'instagram.csv',
+        path: './instagram.csv',
+      },
+    ],
+  };
+  if (dataArr.length > 0) {
+    transporter.sendMail(mailOptions, function (err, info) {
+      if (err) {
+        console.log(err);
+      } else {
+        console.log(info);
+      }
+    });
 
-      // Output the end
-      console.log('END ' + dataArr.length);
-    }
+    // Output the end
+    console.log('END ' + dataArr.length);
   }
 }
 
 function getTitle(content) {
   // Find the index of the first and last square brackets.
   const titleOpen = content.indexOf('【') || content.indexOf('【');
-  const titleClose = content.indexOf('】') ||content.indexOf('】');
+  const titleClose = content.indexOf('】') || content.indexOf('】');
   if (titleOpen < 0 || titleClose < 0) {
     // Return an empty string if the title is not found.
     return '';
