@@ -107,7 +107,7 @@ async function processContent(content) {
       // Get the item description
       message = message.substring(0, 300);
 
-      const seoDescription = message.substring(0, 230);
+      const seoDescription = message.substring(0, 200);
 
       //find latest time
       if (latestTime == null || latestTime < messageDate) {
@@ -167,7 +167,7 @@ function writeCsv() {
   const csvWriter = createCsvWriter({
     path: 'instagram.csv',
     header: [
-      {id: 'id', title: 'No'},
+      {id: 'id', title: 'Product Handle'},
       {id: 'engTitle', title: 'Eng Title'},
       {id: 'chiTitle', title: 'Chi Title'},
       {id: 'engSummary', title: 'Eng Summary'},
@@ -180,20 +180,32 @@ function writeCsv() {
       {id: 'chiSeoDescription', title: 'Chi SEO Description'},
       {id: 'seoKeywords', title: 'SEO keywords'},
       {id: 'preorderItem', title: 'Preorder Item'},
-      {id: 'preorderEngNote', title: 'Preorder Eng Note'},
       {id: 'preorderChiNote', title: 'Preorder Chi Note'},
+      {id: 'preorderEngNote', title: 'Preorder Eng Note'},
+      {id: 'unlimitedPreorderSupply', title: 'Unlimited Preorder Supply'},
+      {id: 'preorderLimit', title: 'Preorder Limit'},
       {id: 'onlineStoreStatus', title: 'Online Store Status'},
-      {id: 'picture', title: 'Picture'},
-      {id: 'additionalPicture', title: 'Additional Picture'},
+      {id: 'retailStoreStatus', title: 'Retail Store Status'},
+      {id: 'picture', title: 'Images'},
+      {id: 'additionalPicture', title: 'Additional Images'},
       {id: 'onlineStoreCategoriesEng', title: 'Online Store Categories Eng'},
       {id: 'onlineStoreCategoriesChi', title: 'Online Store Categories Chi'},
+      {id: 'posCatChi', title: 'POS Categories(Chinese)'},
+      {id: 'posCatEng', title: 'POS Categories(English)'},
       {id: 'price', title: 'Price'},
       {id: 'salePrice', title: 'Sale Price'},
+      {id: 'productRetailStorePrice', title: 'Product Retail Store Price'},
+      {id: 'storeSpecificPrice', title: 'Store-Specific Price'},
       {id: 'cost', title: 'cost'},
+      {id: 'domesticTaxType', title: 'Domestic Tax Type'},
+      {id: 'overseaTaxType', title: 'Oversea Tax Type'},
       {id: 'sku', title: 'sku'},
+      {id: 'memberPrice', title: 'Member Price'},
       {id: 'quantity', title: 'quantity'},
       {id: 'weight', title: 'weight'},
+      {id: 'supplier', title: 'Supplier'},
       {id: 'productTag', title: 'Product Tag'},
+      {id: 'hiddenProduct', title: 'Hidden Product'},
       {id: 'specificationNameAEng', title: 'Specification Name A Eng'},
       {id: 'specificationNameAChi', title: 'Specification Name A Chi'},
       {id: 'specificationNameBEng', title: 'Specification Name B Eng'},
@@ -205,7 +217,10 @@ function writeCsv() {
       {id: 'b', title: 'Variation name B(Chinese)'},
       {id: 'c', title: 'Variation quantity'},
       {id: 'd', title: 'Variation price'},
-      {id: 'e', title: 'Variant Sale Price'},
+      {id: 'variantSalePrice', title: 'Variant Sale Price'},
+      {id: 'variantRetailStorePrice', title: 'Variant Retail Store Price'},
+      {id: 'variantStore-SpecificPrice', title: 'Variant Store-Specific Price'},
+      {id: 'variantMemberPrice', title: 'Variant Member Price'},
       {id: 'f', title: 'Variant Cost'},
       {id: 'g', title: 'Variation SKU'},
       {id: 'h', title: 'Variant Weight'},
@@ -274,7 +289,7 @@ function getTitle(content) {
   const title = content.substring(titleOpen + 1, titleClose);
   return title;
 }
-
+ 
 function getSize(content) {
   // find the start of the size description
   const sizeOpen = content.indexOf('/');
