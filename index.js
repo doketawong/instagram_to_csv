@@ -55,15 +55,36 @@ client.query(query, (err, res) => {
 
 async function apiCall() {
   dataArr = [];
-  const response = await axios.get(url + access_token);
-  await processContent(response);
-  if (dataArr.length > 0) {
-    writeCsv();
+  try {
+    const response = await axios.get(url + access_token);
+    await processContent(response);
+    if (dataArr.length > 0) {
+      writeCsv();
+    }
+  } catch (error) {
+    console.error('Failed to fetch data:', error.message);
+    
+    // Send error alert email
+    const errorMailOptions = {
+      from: 'spijjw003@gmail.com',
+      to: '1155086874@link.cuhk.edu.hk',
+      subject: 'ERROR ALERT: Instagram Data Fetch Failed',
+      text: `Failed to fetch Instagram data at ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Hong_Kong' })}\n\nError details:\n${error.message}\n\nPlease check the application and API access token.`
+    };
+
+    transporter.sendMail(errorMailOptions, function (err, info) {
+      if (err) {
+        console.error('Failed to send error alert email:', err);
+      } else {
+        console.log('Error alert email sent:', info.response);
+      }
+    });
   }
 }
 
 async function processContent(content) {
   // For each item in the content data
+  console.log('processing content...' + new Date());
   let previousDate = true;
   for (const item of content.data.data) {
     // Get the item ID
@@ -107,7 +128,7 @@ async function processContent(content) {
       // Get the item description
       message = message.substring(0, 300);
 
-      const seoDescription = message.substring(0, 230);
+      const seoDescription = message.substring(0, 200);
 
       //find latest time
       if (latestTime == null || latestTime < messageDate) {
@@ -140,7 +161,7 @@ async function processContent(content) {
         await client.query(
           `INSERT INTO "product_list" ("id", "content", "title", "price","createdate")  
       VALUES ($1, $2, $3, $4, $5)`,
-          [id, message, title, price, createTime],
+          [id, message, title, 230, createTime],
         );
       }
     } else {
@@ -312,10 +333,9 @@ function getPrice(content) {
     var price = content.substring(priceIndex + 1, priceIndex + 4);
     // If the last character is not a number, remove it
     if (!isNumber(price.substring(price.length - 1))) {
-      price = price.substring(0, price.length - 1);
+      price = price.substring(0, price.length - 1); 
     }
   }
-
   // Return the price
   return price;
 }
