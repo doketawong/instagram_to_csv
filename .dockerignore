@@ -1,0 +1,10 @@
+node_modules
+package-lock.json
+Dockerfile
+docker-compose.yml
+.vscode
+.git
+.env
+instagram.xlsx
+instagram.csv
+*.log

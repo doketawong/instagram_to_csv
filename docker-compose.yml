@@ -1,0 +1,27 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    depends_on:
+      - db
+    # Override .env's DB_HOST=localhost so the container can reach Postgres.
+    environment:
+      DB_HOST: db
+    env_file: .env
+    volumes:
+      # Provide .env at runtime so `dotenv.config()` can load it.
+      - ./.env:/app/.env:ro
+    command: ["node", "index.js"]
+
+volumes:
+  pgdata:
