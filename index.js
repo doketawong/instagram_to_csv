@@ -15,16 +15,52 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const {DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_DATABASE, ACCESS_TOKEN} =
-  process.env;
+const {
+  DB_USER,
+  DB_PASSWORD,
+  DB_HOST,
+  DB_PORT,
+  DB_DATABASE,
+  ACCESS_TOKEN,
+  JDBC_URL,
+  DATABASE_URL,
+} = process.env;
 
-const client = new Client({
-  user: DB_USER,
-  host: DB_HOST,
-  database: DB_DATABASE,
-  password: DB_PASSWORD,
-  port: DB_PORT,
-});
+function buildPostgresClientConfig() {
+  // Base config (works with your existing DB_* env vars).
+  const config = {
+    user: DB_USER,
+    password: DB_PASSWORD,
+    host: DB_HOST,
+    database: DB_DATABASE,
+    port: DB_PORT ? Number(DB_PORT) : undefined,
+  };
+
+  // Optional: allow JDBC-style URL, e.g.:
+  //   jdbc:postgresql://100.122.223.11:5433/some2some
+  // If provided, it overrides host/port/database (and can also provide user/pass).
+  const urlFromEnv = JDBC_URL || DATABASE_URL;
+  if (urlFromEnv) {
+    const normalized = urlFromEnv.replace(/^jdbc:/, ''); // -> postgresql://...
+    const u = new URL(normalized);
+
+    if (u.hostname) config.host = u.hostname;
+    if (u.port) config.port = Number(u.port);
+
+    const dbName = (u.pathname || '').replace(/^\//, '');
+    if (dbName) config.database = decodeURIComponent(dbName);
+
+    if (u.username) config.user = decodeURIComponent(u.username);
+    if (u.password) config.password = decodeURIComponent(u.password);
+  }
+
+  // Remove undefined values so pg can rely on its defaults when appropriate.
+  return Object.fromEntries(
+    Object.entries(config).filter(([, value]) => value !== undefined),
+  );
+}
+
+const client = new Client(buildPostgresClientConfig());
 
 client.connect(function (err) {
   if (err) throw err;
@@ -59,7 +95,7 @@ async function apiCall() {
     const response = await axios.get(url + access_token);
     await processContent(response);
     if (dataArr.length > 0) {
-      writeCsv();``
+      writeCsv();
     } else {
       console.log('No new products found to generate in Excel file.');
     }

@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
+    profiles: ["embedded"]
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -12,11 +13,6 @@ services:
 
   app:
     build: .
-    depends_on:
-      - db
-    # Override .env's DB_HOST=localhost so the container can reach Postgres.
-    environment:
-      DB_HOST: db
     env_file: .env
     volumes:
       # Provide .env at runtime so `dotenv.config()` can load it.
