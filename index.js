@@ -67,10 +67,11 @@ client.connect(function (err) {
   console.log('Connected!');
 });
 
-const url =
-  'https://graph.facebook.com/v17.0/355915284524115/feed?access_token=';
-const pictureUrl = 'https://graph.facebook.com/v17.0/';
-const pictureAccess = '/attachments?access_token=';
+const GRAPH_VERSION = 'v22.0';
+const PAGE_ID = '355915284524115';
+const graphBaseUrl = `https://graph.facebook.com/${GRAPH_VERSION}`;
+const url = `${graphBaseUrl}/${PAGE_ID}/feed`;
+const pictureUrl = `${graphBaseUrl}/`;
 let access_token = ACCESS_TOKEN;
 let dataArr = [];
 let lastProcessDate;
@@ -92,7 +93,16 @@ client.query(query, (err, res) => {
 async function apiCall() {
   dataArr = [];
   try {
-    const response = await axios.get(url + access_token);
+    const pageAccessToken = await getPageAccessToken(access_token, PAGE_ID);
+    const response = await axios.get(url, {
+      // Graph API is most reliable when access_token is passed as a query param.
+      // Also request explicit fields to avoid "Unsupported get request" / missing field issues.
+      params: {
+        access_token: pageAccessToken,
+        fields: 'message,created_time',
+        limit: 100,
+      },
+    });
     await processContent(response);
     if (dataArr.length > 0) {
       writeCsv();
@@ -100,7 +110,15 @@ async function apiCall() {
       console.log('No new products found to generate in Excel file.');
     }
   } catch (error) {
-    console.error('Failed to fetch data: ', error.message);
+    const status = error?.response?.status;
+    const apiError = error?.response?.data;
+    console.error(
+      'Failed to fetch data: ',
+      status ? `Request failed with status code ${status}` : error.message,
+    );
+    if (apiError) {
+      console.error('Graph API error response:', JSON.stringify(apiError));
+    }
 
     // Send error alert email
     const errorMailOptions = {
@@ -111,7 +129,7 @@ async function apiCall() {
         'en-US',
         {timeZone: 'Asia/Hong_Kong'},
       )}\n\nError details:\n${
-        error.message
+        apiError ? JSON.stringify(apiError, null, 2) : error.message
       }\n\nPlease check the application and API access token.`,
     };
 
@@ -125,9 +143,30 @@ async function apiCall() {
   }
 }
 
+async function getPageAccessToken(userAccessToken, pageId) {
+  const res = await axios.get(`${graphBaseUrl}/me/accounts`, {
+    params: {access_token: userAccessToken},
+  });
+
+  const data = res?.data?.data;
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error(
+      'No pages returned from /me/accounts. Check token permissions (pages_show_list / pages_read_engagement).',
+    );
+  }
+
+  const page = data.find(p => String(p.id) === String(pageId)) || data[0];
+  if (!page?.access_token) {
+    throw new Error('Page access token not found in /me/accounts response.');
+  }
+
+  return page.access_token;
+}
+
 async function processContent(content) {
   // For each item in the content data
   console.log('processing content...' + new Date());
+  const pageAccessToken = await getPageAccessToken(access_token, PAGE_ID);
   let previousDate = true;
   for (const item of content.data.data) {
     // Get the item ID
@@ -162,10 +201,15 @@ async function processContent(content) {
       // Get the item picture
       let picture;
       await axios
-        .get(pictureUrl + id + pictureAccess + access_token)
+        .get(`${pictureUrl}${id}/attachments`, {
+          params: {
+            access_token: pageAccessToken,
+            fields: 'media{image}',
+          },
+        })
         .then(function (tempResponse) {
-          const pictureUrl = tempResponse.data.data[0];
-          picture = pictureUrl.media.image.src;
+          const attachment0 = tempResponse?.data?.data?.[0];
+          picture = attachment0?.media?.image?.src;
         });
 
       // Get the item description
@@ -217,7 +261,11 @@ async function processContent(content) {
     //TODO: skip next page if current page date is earlier than last process date
     // Get the next page content
     console.log('getting next page...');
-    axios.get(content.data.paging.next).then(function (tempResponse) {
+    axios
+      .get(content.data.paging.next, {
+        params: {access_token: pageAccessToken},
+      })
+      .then(function (tempResponse) {
       // Process the next page content
       processContent(tempResponse);
     });
