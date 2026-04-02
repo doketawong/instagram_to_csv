@@ -643,6 +643,6 @@ schedule.scheduleJob('0 0 */50 * *', async function () {
 apiCall();
 
 //recursive call every day at 17:30
-schedule.scheduleJob('30 17 * * *', function () {
+schedule.scheduleJob('30 09 * * *', function () {
   apiCall();
 });
